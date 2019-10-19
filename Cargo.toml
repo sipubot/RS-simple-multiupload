@@ -1,0 +1,31 @@
+[package]
+name = "multiuploader"
+version = "0.1.0"
+authors = ["sipu"]
+edition = "2018"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "multiuploader"
+path = "src/main.rs"
+
+[dependencies]
+actix-web = "1.0.0"
+actix-multipart = "0.1.1"
+futures = "0.1.27"
+env_logger = "0.6.1"
+actix-files = "0.1.2"
+bytes = "0.4"
+serde="1.0.91"
+serde_json = "1.0"
+serde_derive="1.0.91"
+json = "0.11.14"
+derive_more = "0.14"
+jsonwebtoken = "6.0.1"
