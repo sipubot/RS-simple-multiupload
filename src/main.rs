@@ -25,8 +25,8 @@ pub struct AppState {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ViewContent {
-    pub images: Vec<String>,
-    pub angle360: bool,
+    pub totalcnt: i32,
+    pub r#loop: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ fn load_app_path() -> String {
     let path = Path::new("config.json");
     if path.exists() {
         let config: Config = serde_json::from_value(file_read_to_json("config.json").unwrap()).unwrap();
-        config.ip_port_set
+        config.app_path
     } else {
         "http://172.31.50.155:9999/".to_string()
     }
@@ -89,7 +89,7 @@ pub fn save_file(field: Field) -> impl Future<Item = i64, Error = ActixError> {
         Some(filename) => filename.replace(' ', "_").to_string(),
         None => return Either::A(err(error::ErrorInternalServerError("Couldn't read the filename.")))
     };
-    let filename = match &file_path_string.rfind("/") {
+    let filename = match &file_path_string.rfind('/') {
         Some(idx) => {
             let path = format!("static/images/{}", &file_path_string[0..*idx]);
             fs::create_dir_all(&path).expect("make path Fail");
@@ -149,11 +149,17 @@ pub fn uploadimage(
 }
 
 pub fn uploadjson (req: HttpRequest, _data: web::Json<ViewContent>) -> HttpResponse  {
-    let json_name = req.match_info().get("param").unwrap(); println!("{}",req.uri());
-    let pathstr = format!("item/{}.json",json_name);
+    let item_no = req.match_info().get("item_no").unwrap();
+    let seq = req.match_info().get("seq").unwrap();
+    let filename = req.match_info().get("filename").unwrap();
+
+    let path = format!("static/images/{}/{}", &item_no, &seq);
+    fs::create_dir_all(&path).expect("make path Fail");
+    
+    let pathstr = format!("static/images/{}/{}/{}.json", &item_no, &seq, &filename);
     let path = Path::new(&pathstr);
     let mut data: ViewContent = _data.into_inner();
-    data.images = data.images.into_iter().map(|x|format!("{}static/images/{}",load_app_path(),x)).collect();
+    //data.images = data.images.into_iter().map(|x|format!("{}static/images/{}",load_app_path(),x)).collect();
     let json = serde_json::to_string(&serde_json::to_value(data).unwrap()).unwrap();
 
     match File::create(&path) {
@@ -195,8 +201,8 @@ fn main() -> std::io::Result<()> {
                     .route(web::get().to(index))
                     .route(web::post().to_async(uploadimage)),
             )
-            .service(web::resource("/uploadjson/{param}").route(web::post().to_async(uploadjson)))
-            .service(web::resource("/item/{param}").route(web::get().to(filenameload)))
+            .service(web::resource("/uploadjson/{item_no}/{seq}/{filename}").route(web::post().to_async(uploadjson)))
+            .service(web::resource("/static/images").route(web::get().to(filenameload)))
             .service(actfs::Files::new("/static", "static").show_files_listing())
     })
     .bind(load_ip_port())?
