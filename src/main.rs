@@ -1,23 +1,17 @@
-#![allow(unused_imports)]
 #[macro_use]
-extern crate json;
 extern crate serde_derive;
 
 use std::cell::Cell;
 use std::fs;
-use std::io::Write;
-use std::error::Error;
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 
-use actix_files as actfs;
-use actix_multipart::{Field, Multipart, MultipartError};
-use actix_web::{error, middleware, web, App, Error as ActixError, HttpRequest, HttpResponse, HttpServer};
-use futures::future::{err, Either};
-use futures::{Future, Stream};
-use serde_json::{Result, json, Value};
-use serde::Serialize;
-use serde::Deserialize;
+use actix_multipart::Multipart;
+use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer};
+use futures_util::TryStreamExt as _;
+
+use serde_json::{ json, Value};
 
 pub struct AppState {
     pub counter: Cell<usize>,
@@ -44,7 +38,7 @@ fn load_ip_port() -> String {
         "0.0.0.0:9999".to_string()
     }
 }
-
+#[allow(dead_code)]
 fn load_app_path() -> String {
     let path = Path::new("config.json");
     if path.exists() {
@@ -70,85 +64,21 @@ pub fn file_read_to_json(_filepath: &str) -> serde_json::Result<Value> {
     println!("{:?}",_filepath);
     match fs::read_to_string(&pathstring) {
         Err(e) => {
-            println!("{:?}",e.description());
-            Ok(json!(format!("Error:{}",e.description())))
+            println!("{:?}",e);
+            Ok(json!(format!("Error:{}",e)))
         },
         Ok(file) => serde_json::from_str(&*file),
     }
 }
 
-fn filenameload (req: HttpRequest) -> HttpResponse {
+async fn filenameload (req: HttpRequest) -> HttpResponse {
     println!("{:?}",req.headers());
     println!("{:?}",req.query_string());
     println!("{:?}",req.match_info().get("param").unwrap());
     HttpResponse::Ok().json(file_read_to_json(&format!("item/{}.json",req.match_info().get("param").unwrap())).unwrap())
 }
 
-pub fn save_file(field: Field) -> impl Future<Item = i64, Error = ActixError> {
-    let file_path_string = match field.content_disposition().unwrap().get_filename() {
-        Some(filename) => filename.replace(' ', "_").to_string(),
-        None => return Either::A(err(error::ErrorInternalServerError("Couldn't read the filename.")))
-    };
-    let filename = match &file_path_string.rfind('/') {
-        Some(idx) => {
-            let path = format!("static/images/{}", &file_path_string[0..*idx]);
-            fs::create_dir_all(&path).expect("make path Fail");
-            &file_path_string
-        },
-        None => &file_path_string
-    };
-    let file = match fs::File::create(format!("static/images/{}",filename)) {
-        Ok(file) => file,
-        Err(e) => return Either::A(err(error::ErrorInternalServerError(e))),
-    };
-    Either::B(
-        field
-            .fold((file, 0i64), move |(mut file, mut acc), bytes| {
-                // fs operations are blocking, we have to execute writes
-                // on threadpool
-                web::block(move || {
-                    file.write_all(bytes.as_ref()).map_err(|e| {
-                        println!("file.write_all failed: {:?}", e);
-                        MultipartError::Payload(error::PayloadError::Io(e))
-                    })?;
-                    acc += bytes.len() as i64;
-                    Ok((file, acc))
-                })
-                .map_err(|e: error::BlockingError<MultipartError>| {
-                    match e {
-                        error::BlockingError::Error(e) => e,
-                        error::BlockingError::Canceled => MultipartError::Incomplete,
-                    }
-                })
-            })
-            .map(|(_, acc)| acc)
-            .map_err(|e| {
-                println!("save_file failed, {:?}", e);
-                error::ErrorInternalServerError(e)
-            }),
-    )
-}
-
-pub fn uploadimage(
-    multipart: Multipart,
-    counter: web::Data<Cell<usize>>,
-) -> impl Future<Item = HttpResponse, Error = ActixError> {
-    counter.set(counter.get() + 1);
-    println!("{:?}", counter.get());
-
-    multipart
-        .map_err(error::ErrorInternalServerError)
-        .map(|field| save_file(field).into_stream())
-        .flatten()
-        .collect()
-        .map(|sizes| HttpResponse::Ok().json(sizes))
-        .map_err(|e| {
-            println!("failed: {}", e);
-            e
-        })
-}
-
-pub fn uploadjson (req: HttpRequest, _data: web::Json<ViewContent>) -> HttpResponse  {
+pub async fn uploadjson (req: HttpRequest, _data: web::Json<ViewContent>) -> HttpResponse  {
     let item_no = req.match_info().get("item_no").unwrap();
     let seq = req.match_info().get("seq").unwrap();
     let filename = req.match_info().get("filename").unwrap();
@@ -177,34 +107,71 @@ pub fn uploadjson (req: HttpRequest, _data: web::Json<ViewContent>) -> HttpRespo
     }
 }
 
-fn index() -> HttpResponse {
+async fn index() -> HttpResponse {
     match fs::read_to_string("static/index.html") {
         Err(e) => {
-            println!("{:?}",e.description());
+            println!("{:?}",e);
             HttpResponse::Ok().body("")
         },
         Ok(html) => HttpResponse::Ok().body(html),
     }
 }
 
+async fn uploadimage(mut multipart: Multipart, counter: web::Data<Cell<usize>>,) -> actix_web::Result<HttpResponse, actix_web::Error> {
+    counter.set(counter.get() + 1);
+    println!("{:?}", counter.get());
 
-fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_server=info,actix_web=info");
-    env_logger::init();
+    // iterate over multipart stream
+    while let Some(mut field) = multipart.try_next().await? {
+        // A multipart/form-data stream has to contain `content_disposition`
+        let content_disposition = field.content_disposition();
+
+        let mut file_path_string = content_disposition
+            .get_filename()
+            .map_or_else(|| uuid::Uuid::new_v4().to_string(), sanitize);
+
+        file_path_string = file_path_string.replace(' ', "_").to_string();
+        let filename = match &file_path_string.rfind('/') {
+            Some(idx) => {
+                let path = format!("static/images/{}", &file_path_string[0..*idx]);
+                fs::create_dir_all(&path).expect("make path Fail");
+                &file_path_string
+            },
+            None => &file_path_string
+        };
+
+        let filepath = format!("static/images/{filename}");
+        // File::create is blocking operation, use threadpool
+        let mut f = web::block(|| std::fs::File::create(filepath)).await??;
+
+        // Field in turn is stream of *Bytes* object
+        while let Some(chunk) = field.try_next().await? {
+            // filesystem operations are blocking, we have to use threadpool
+            f = web::block(move || f.write_all(&chunk).map(|_| f)).await??;
+        }
+    }
+    Ok(HttpResponse::Ok().into())
+}
+
+pub fn sanitize<S: AsRef<str>>(name: S) -> String {
+    "flisjhfskjrk3wshkwsef".to_string()
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    std::env::set_var("RUST_LOG", "info");
+    std::fs::create_dir_all("./tmp")?;
 
     HttpServer::new(|| {
-        App::new()
-            .data(Cell::new(0usize))
-            .wrap(middleware::Logger::default())
-            .service(
-                web::resource("/uploadimage")
-                    .route(web::get().to(index))
-                    .route(web::post().to_async(uploadimage)),
-            )
-            .service(web::resource("/uploadjson/{item_no}/{seq}/{filename}").route(web::post().to_async(uploadjson)))
-            .service(web::resource("/static/images").route(web::get().to(filenameload)))
-            .service(actfs::Files::new("/static", "static").show_files_listing())
+        App::new().wrap(middleware::Logger::default()).service(
+            web::resource("/uploadimage")
+                .route(web::get().to(index))
+                .route(web::post().to(uploadimage)),
+        )
+        .service(web::resource("/uploadjson/{item_no}/{seq}/{filename}").route(web::post().to(uploadjson)))
+        .service(web::resource("/static/images").route(web::get().to(filenameload)))
     })
     .bind(load_ip_port())?
     .run()
+    .await
 }

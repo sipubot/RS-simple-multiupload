@@ -17,15 +17,12 @@ name = "multiuploader"
 path = "src/main.rs"
 
 [dependencies]
-actix-web = "1.0.0"
-actix-multipart = "0.1.1"
-futures = "0.1.27"
-env_logger = "0.6.1"
-actix-files = "0.1.2"
-bytes = "0.4"
+actix-web = "4.1.0"
+actix-multipart = "0.4.0"
+actix-files = "0.6.1"
 serde="1.0.91"
 serde_json = "1.0"
 serde_derive="1.0.91"
-json = "0.11.14"
-derive_more = "0.14"
-jsonwebtoken = "6.0.1"
+derive_more = "0.99.17"
+uuid = { version = "1.1.2", features = ["v4"] }
+futures-util = { version = "0.3.21", default-features = false, features = ["std"] }
