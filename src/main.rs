@@ -153,7 +153,7 @@ async fn uploadimage(mut multipart: Multipart, counter: web::Data<Cell<usize>>,)
     Ok(HttpResponse::Ok().into())
 }
 
-pub fn sanitize<S: AsRef<str>>() -> String {
+pub fn sanitize<S: AsRef<str>>(_name: S) -> String {
     "flisjhfskjrk3wshkwsef".to_string()
 }
 
