@@ -88,7 +88,7 @@ pub async fn uploadjson (req: HttpRequest, _data: web::Json<ViewContent>) -> Htt
     
     let pathstr = format!("static/images/{}/{}/{}.json", &item_no, &seq, &filename);
     let path = Path::new(&pathstr);
-    let mut data: ViewContent = _data.into_inner();
+    let data: ViewContent = _data.into_inner();
     //data.images = data.images.into_iter().map(|x|format!("{}static/images/{}",load_app_path(),x)).collect();
     let json = serde_json::to_string(&serde_json::to_value(data).unwrap()).unwrap();
 
@@ -153,7 +153,7 @@ async fn uploadimage(mut multipart: Multipart, counter: web::Data<Cell<usize>>,)
     Ok(HttpResponse::Ok().into())
 }
 
-pub fn sanitize<S: AsRef<str>>(name: S) -> String {
+pub fn sanitize<S: AsRef<str>>(_name: S) -> String {
     "flisjhfskjrk3wshkwsef".to_string()
 }
 
