@@ -17,12 +17,12 @@ name = "multiuploader"
 path = "src/main.rs"
 
 [dependencies]
-actix-web = "4.9.0"
+actix-web = "4.10.2"
 actix-multipart = "0.7.2"
 actix-files = "0.6.6"
-serde="1.0.217"
-serde_json = "1.0.138"
-serde_derive="1.0.217"
+serde="1.0.219"
+serde_json = "1.0.140"
+serde_derive="1.0.219"
 derive_more = { version = "2.0.1", features = ["full"] }
-uuid = { version = "1.13.1",  features = ["v4"] }
+uuid = { version = "1.16.0",  features = ["v4"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
