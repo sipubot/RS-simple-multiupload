@@ -126,7 +126,7 @@ async fn uploadimage(mut multipart: Multipart, counter: web::Data<Cell<usize>>,)
     // iterate over multipart stream
     while let Some(mut field) = multipart.try_next().await? {
         // A multipart/form-data stream has to contain `content_disposition`
-        let content_disposition = field.content_disposition();
+        let content_disposition = field.content_disposition().unwrap();
 
         let mut file_path_string = content_disposition
             .get_filename()
