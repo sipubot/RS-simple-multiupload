@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate serde_derive;
 
 use std::cell::Cell;
 use std::fs;
@@ -8,7 +6,7 @@ use std::io::Write;
 use std::path::Path;
 
 use actix_multipart::Multipart;
-use actix_web::{middleware, web, App, HttpRequest, HttpResponse, HttpServer};
+use actix_web::{main, middleware, web, App, HttpRequest, HttpResponse, HttpServer};
 use futures_util::TryStreamExt as _;
 
 use serde_json::{ json, Value};
@@ -157,7 +155,7 @@ pub fn sanitize<S: AsRef<str>>(_name: S) -> String {
     "flisjhfskjrk3wshkwsef".to_string()
 }
 
-#[actix_web::main]
+
 async fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "info");
     std::fs::create_dir_all("./tmp")?;
