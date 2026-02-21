@@ -2,7 +2,7 @@
 name = "multiuploader"
 version = "0.1.0"
 authors = ["sipu"]
-edition = "2018"
+edition = "2021"
 
 [profile.dev]
 opt-level = 0
@@ -10,19 +10,17 @@ opt-level = 0
 [profile.release]
 opt-level = 3
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [[bin]]
 name = "multiuploader"
 path = "src/main.rs"
 
 [dependencies]
-actix-web = "4.10.2"
-actix-multipart = "0.7.2"
 actix-files = "0.6.10"
-serde="1.0.219"
-serde_json = "1.0.140"
-serde_derive="1.0.219"
-derive_more = { version = "2.0.1", features = ["full"] }
-uuid = { version = "1.16.0",  features = ["v4"] }
-futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
+actix-multipart = "0.7.2"
+actix-web = "4.13.0"
+derive_more = { version = "2.1.1", features = ["full"] }
+futures-util = { version = "0.3.32", default-features = false, features = ["std"] }
+serde = "1.0.228"
+serde_derive = "1.0.228"
+serde_json = "1.0.149"
+uuid = { version = "1.21.0", features = ["v4"] }
